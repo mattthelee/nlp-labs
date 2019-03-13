@@ -139,23 +139,39 @@ class NmtModel(object):
                                                           variational_recurrent=True,
                                                           dtype=tf.float32)
             lstm_cells = tf.nn.rnn_cell.MultiRNNCell([word_lstm_first, word_lstm_second])
-
             # Perform a run through on a single step of the sequence
             step_decoder_output, curr_states = lstm_cells(step_embeddings,pre_states)
 
-            output_weights = tf.get_variable("output_weights", [shape(step_decoder_output, 1), self.vocab_target_size])
-            output_bias = tf.get_variable("output_bias", [self.vocab_target_size])
-            logits = tf.nn.xw_plus_b(step_decoder_output,output_weights,output_bias)
-            """
-            End Task 2
-            """
-            """
-            Task 3 attention
-            Start
-            """
-            """
-            Ends Task 3
-            """
+            if not self.use_attention:
+
+
+                output_weights = tf.get_variable("output_weights", [shape(step_decoder_output, 1), self.vocab_target_size])
+                output_bias = tf.get_variable("output_bias", [self.vocab_target_size])
+                logits = tf.nn.xw_plus_b(step_decoder_output,output_weights,output_bias)
+
+                # End Task 2
+            else:
+                #Task 3 attention
+                # reshape the output to have an additional final dim
+                reshaped_output = tf.expand_dims(step_decoder_output, -1)
+
+                # Calculate the raw score by matrix mutliplication
+                raw_score = tf.matmul(encoder_outputs,reshaped_output)
+
+                # Apply softmax to score to get prob dist
+                softmax_score = tf.nn.softmax(raw_score,1)
+
+                # Create the attention weighted vector
+                encoded_vector = tf.reduce_sum(softmax_score * encoder_outputs,1)
+
+                concat_vec = tf.concat([step_decoder_output, encoded_vector],1)
+
+                output_weights = tf.get_variable("output_weights", [shape(concat_vec, 1), self.vocab_target_size])
+                output_bias = tf.get_variable("output_bias", [self.vocab_target_size])
+                logits = tf.nn.xw_plus_b(concat_vec,output_weights,output_bias)
+
+                #Ends Task 3
+
         return logits, curr_states
 
     def time_used(self, start_time):
